@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* ====== CV Layout & Typography ====== */
+
+.cv-preview {
+  max-width: 794px; /* A4 width in px (at 96 DPI) */
+  min-height: 1123px; /* A4 height */
+  margin: 40px auto;
+  padding: 48px;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.05);
+}
+
+.cv-preview h1,
+.cv-preview h2,
+.cv-preview h3 {
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.cv-preview p {
+  margin-bottom: 0.8rem;
+  color: #1f2937;
+}
+
+.cv-preview section {
+  margin-top: 1.5rem;
+}
+
+/* ====== Print/PDF Optimization ====== */
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  .cv-preview {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0;
+    width: 100%;
+    min-height: auto;
+  }
+}

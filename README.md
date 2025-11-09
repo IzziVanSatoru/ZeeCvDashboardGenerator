@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Zeedashboardskiw
 
-## Getting Started
+## Deskripsi Singkat
+**Zeedashboardskiw** adalah projek dashboard CV generate untuk buat CV atas 
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Fitur Utama
+- **Login & Verifikasi User (Firebase)**  
+- **Halaman Dashboard Dinamis** setelah login  
+- **Struktur Modular** dengan App Router (`app/`)  
+- **Tampilan Estetis & Responsif**  
+
+---
+
+## Struktur Folder
+```
+zeedashboardskiw/
+├── app/
+│   ├── layout.jsx              # Layout utama (wrapper semua halaman + Footer)
+│   ├── page.jsx                # Halaman Login / Landing Page
+│   ├── dashboard/
+│   │   └── page.jsx            # Dashboard utama (setelah login)
+│   └── api/
+│       └── verify-user/
+│           └── route.js        # API verifikasi user (Firebase)
+├── components/                 # Komponen UI reusable
+├── styles/                     # File CSS global (App.css)
+├── package.json
+└── README.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Alur Aplikasi (Flow Chart)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
++--------------------+
+|   User Buka App    |
++--------------------+
+          |
+          v
++--------------------+
+|   Halaman Login    |
++--------------------+
+          |
+          v
++------------------------------+
+| API /verify-user (Firebase)  |
++------------------------------+
+          |
+          v
++--------------------+
+|   Dashboard Page   |
++--------------------+
+          |
+          v
++--------------------+
+|   cave genrator   |
++--------------------+
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Cara Menjalankan Proyek
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 1. Clone repository
+```bash
+git https://github.com/IzziVanSatoru/ZeeCvDashboardGenerator.git
+cd ZeeCvDashboardGenerator
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 2. Install dependencies
+```bash
+npm install
+```
 
-## Deploy on Vercel
+### 3. Jalankan aplikasi
+```bash
+npm run dev
+```
+Lalu buka di browser: [http://localhost:3000](http://localhost:3000)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Teknologi yang Digunakan
+- **Next.js 14 (App Router)**
+- **React 18**
+- **Firebase Auth API**
+- **Open router ai model Chat gpt o4 mini**
+- **CSS (App.css)**
+
+---
+
+## Pembuat
+**izziVanSatoru**
+
+## Note
+model ai nya dari open roueter bisa di custom sendiri model ai bisa pake model ai apa aja di open router dan biasain pake api sendiri karena model nya pake sistem BYOK di open router

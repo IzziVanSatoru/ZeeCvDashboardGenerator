@@ -1,8 +1,10 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# =========================================
+# ✅ GITIGNORE FILE UNTUK PROYEK NEXT.JS
+# =========================================
 
-# dependencies
-/node_modules
-/.pnp
+# === Dependencies ===
+node_modules/
+.pnp
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -10,32 +12,43 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
+# === Build & Output ===
+.next/
+out/
+dist/
+build/
+.cache/
+coverage/
 
-# next.js
-/.next/
-/out/
+# === Environment Files ===
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
 
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# === Debug Logs ===
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# === System Files ===
+.DS_Store
+Thumbs.db
 
-# vercel
+# === IDE / Editor ===
+.vscode/
+.idea/
+
+# === Misc ===
+*.pem
+next-env.d.ts
+*.tsbuildinfo
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# === Notes ===
+# Untuk informasi lebih lanjut:
+# https://help.github.com/articles/ignoring-files/

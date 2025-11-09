@@ -8,13 +8,21 @@
     "start": "next start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.80.0",
+    "firebase": "^12.5.0",
+    "firebase-admin": "^13.6.0",
+    "html2canvas": "^1.4.1",
+    "html2pdf.js": "0.12.1",
+    "js-cookie": "^3.0.5",
+    "jspdf": "^3.0.3",
+    "next": "16.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "next": "16.0.1"
+    "stripe": "^19.3.0"
   },
   "devDependencies": {
-    "babel-plugin-react-compiler": "1.0.0",
     "@tailwindcss/postcss": "^4",
+    "babel-plugin-react-compiler": "1.0.0",
     "tailwindcss": "^4"
   }
 }
