@@ -1,4 +1,6 @@
 "use client";
+export const dynamic = "force-dynamic"; // ✅ Fix build error di Vercel tanpa ubah logic
+
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
