@@ -37,7 +37,9 @@ export default function Page() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white">
-      <h1 className="text-3xl font-bold mb-6">🔥 ZeeDashboard</h1>
+      <h1 className="text-3xl font-bold mb-6">🔥 ZeeDashboard Cv Generator Ai
+        Chat gpt 4o mini
+      </h1>
       <button
         onClick={handleLogin}
         className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:scale-105 transition-all shadow-lg"

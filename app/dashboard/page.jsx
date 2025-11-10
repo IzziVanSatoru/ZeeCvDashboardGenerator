@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const [formData, setFormData] = useState({
@@ -19,13 +20,45 @@ export default function DashboardPage() {
   const [generatedCV, setGeneratedCV] = useState("");
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [editedContent, setEditedContent] = useState("");
+  const [history, setHistory] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // === LOCAL CACHE ===
-  useEffect(() => {
-    const cached = localStorage.getItem("ai_cv_memory");
-    if (cached) {
-      setRecommendations(JSON.parse(cached));
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // === NEW LOGOUT FEATURE ===
+  const handleLogout = () => {
+    const confirmLogout = window.confirm("Apakah anda ingin keluar?");
+    if (confirmLogout) {
+      const confirmFinal = prompt('Ketik "For real" untuk keluar atau "Nah ah" untuk batal:');
+      if (confirmFinal && confirmFinal.toLowerCase() === "for real") {
+        alert("👋 Anda telah keluar.");
+        router.push("/");
+      } else {
+        alert("👍 Oke, Anda tetap di sini.");
+      }
     }
+  };
+
+  useEffect(() => {
+    const sharedCV = searchParams.get("cv");
+    if (sharedCV) {
+      try {
+        const decoded = decodeURIComponent(atob(sharedCV));
+        setGeneratedCV(decoded);
+        setEditedContent(decoded);
+        alert("📄 CV dari link berhasil dimuat!");
+      } catch {
+        console.error("Gagal decode CV dari link.");
+      }
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    localStorage.removeItem("ai_cv_memory");
+    const saved = localStorage.getItem("manual_saved_cv_history");
+    if (saved) setHistory(JSON.parse(saved));
   }, []);
 
   const saveToCache = (text) => {
@@ -34,39 +67,51 @@ export default function DashboardPage() {
     localStorage.setItem("ai_cv_memory", JSON.stringify(newCache));
   };
 
-  // === GENERATE CV ===
   const handleGenerate = async () => {
     setLoading(true);
     try {
       const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_KEY;
       if (!apiKey) throw new Error("API key tidak ditemukan di .env.local");
 
-      const kontakHTML = `
+      const filledFormData = Object.fromEntries(
+        Object.entries(formData).map(([key, value]) => [key, value?.trim() || ""])
+      );
+
+      const kontakParts = [];
+      if (filledFormData.telepon)
+        kontakParts.push(`<strong>Telepon:</strong> ${filledFormData.telepon}`);
+      if (filledFormData.email)
+        kontakParts.push(`<strong>Email:</strong> ${filledFormData.email}`);
+      if (filledFormData.linkedin)
+        kontakParts.push(`<strong>LinkedIn:</strong> ${filledFormData.linkedin}`);
+
+      const kontakHTML =
+        kontakParts.length > 0
+          ? `
         <div class="contact-info" style="text-align:center; font-size:14px; color:#374151; margin-bottom:20px;">
-          <p><strong>Telepon:</strong> ${formData.telepon || "-"} | 
-          <strong>Email:</strong> ${formData.email || "-"} | 
-          <strong>LinkedIn:</strong> ${formData.linkedin || "-"}</p>
+          <p>${kontakParts.join(" | ")}</p>
         </div>
-      `;
+      `
+          : "";
 
       const contextMemory = recommendations.join("\n");
 
       const prompt = `
-Kamu adalah AI pembuat CV profesional yang selalu menampilkan hasil rapi, elegan, dan tidak berlebihan.
+Kamu adalah AI pembuat CV profesional yang menampilkan hasil rapi, elegan, dan tidak berlebihan.
 
-Instruksi:
+Instruksi penting:
 - Gunakan <h1> hanya untuk Nama.
 - Setelah <h1>, tampilkan Informasi Kontak dalam 1 baris saja (tanpa duplikat).
 - Gunakan <h3> untuk setiap bagian: Profil, Pendidikan, Pengalaman, Keahlian, Sertifikat, Proyek, Referensi.
-- Gunakan <p> untuk deskripsi isi tiap bagian.
-- Hindari label seperti "Informasi Kontak:" atau pengulangan data.
-- Bahasa formal dan profesional.
-
-Berdasarkan memori hasil sebelumnya:
-${contextMemory}
+- Gunakan <p> untuk isi tiap bagian.
+- Jangan tampilkan "(Empty)" jika data kosong — biarkan bagian itu tidak muncul.
+- Bahasa formal, rapi, profesional, tidak berlebihan.
 
 Data pengguna:
-${JSON.stringify(formData, null, 2)}
+${JSON.stringify(filledFormData, null, 2)}
+
+Memori kontekstual sebelumnya:
+${contextMemory}
 `;
 
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -81,7 +126,7 @@ ${JSON.stringify(formData, null, 2)}
             {
               role: "system",
               content:
-                "Kamu adalah AI pembuat Curriculum Vitae profesional dengan layout estetis seperti dokumen HRD resmi.",
+                "Kamu adalah AI pembuat Curriculum Vitae profesional dengan gaya HRD-style formal dan elegan. Fokus pada kejelasan dan struktur yang rapi tanpa mengulang bagian kontak.",
             },
             { role: "user", content: prompt },
           ],
@@ -94,16 +139,16 @@ ${JSON.stringify(formData, null, 2)}
       let result = data?.choices?.[0]?.message?.content || "";
       result = result.replace(/```html|```/g, "").trim();
 
-      // Hapus kontak ganda sebelum menambah baru
-      result = result.replace(
-        /<div class="contact-info"[\s\S]*?<\/div>/gi,
-        ""
-      );
+      result = result
+        .replace(/Informasi Kontak:|Kontak:/gi, "")
+        .replace(/<div class="contact-info"[\s\S]*?<\/div>/gi, "")
+        .replace(/<p>.*?(Telepon|Email|LinkedIn).*?<\/p>/gi, "")
+        .replace(/Telepon:.*?(LinkedIn|Email):.*?<br\s*\/?>/gi, "");
 
-      // Sisipkan hanya satu kontak setelah nama
       result = result.replace(/(<h1[^>]*>.*?<\/h1>)/i, `$1${kontakHTML}`);
 
       setGeneratedCV(result);
+      setEditedContent(result);
       saveToCache(result);
     } catch (error) {
       console.error("❌ Error Generate:", error);
@@ -113,7 +158,6 @@ ${JSON.stringify(formData, null, 2)}
     }
   };
 
-  // === DOWNLOAD PDF ===
   const handleDownloadPDF = () => {
     const cvElement = document.getElementById("cv-preview-content");
     if (!cvElement) return alert("CV belum tersedia untuk diunduh.");
@@ -122,42 +166,35 @@ ${JSON.stringify(formData, null, 2)}
       <html>
         <head>
           <meta charset="UTF-8"/>
-          <title>${formData.nama || "CV"} - Download</title>
+          <title>${formData.nama || "CV"}</title>
           <style>
-            @page { size: A4 portrait; margin: 20mm; }
+            @page { size: A4 portrait; margin: 18mm; }
             body {
-              font-family: 'Calibri', sans-serif;
+              font-family: 'Calibri', 'Segoe UI', sans-serif;
+              background: #ffffff;
               color: #111827;
               line-height: 1.6;
-              background: white;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
             }
-            h1 {
-              text-align: center;
-              font-size: 28px;
-              color: #0f172a;
-              margin-bottom: 4px;
+            h1 { text-align:center; font-size:26px; margin-bottom:4px; color:#1f2937; }
+            h1::after {
+              content:""; display:block; width:90px; height:2.5px; background:#2563eb;
+              margin:8px auto 16px; border-radius:6px;
             }
-            .contact-info {
-              text-align: center;
-              color: #374151;
-              margin-bottom: 18px;
-              font-size: 14px;
-            }
+            .contact-info { text-align:center; font-size:13px; color:#374151; margin-bottom:18px; }
             h3 {
-              border-bottom: 1px solid #d1d5db;
-              color: #1e3a8a;
-              font-size: 17px;
-              margin-top: 18px;
-              padding-bottom: 4px;
+              color:#1d4ed8; font-size:17px; font-weight:600;
+              border-bottom:2px solid #93c5fd; margin-top:20px;
+              margin-bottom:6px; padding-bottom:3px; text-transform:uppercase;
             }
-            p {
-              font-size: 14px;
-              margin: 4px 0;
-            }
-            footer, .no-print { display: none !important; }
+            p { font-size:13.5px; margin:4px 0; color:#1f2937; text-align:justify; }
+            #cv-wrapper { width:85%; max-width:680px; margin:0 auto; }
+            footer, .no-print { display:none !important; }
           </style>
         </head>
-        <body>${cvElement.innerHTML}</body>
+        <body><div id="cv-wrapper">${cvElement.innerHTML}</div></body>
       </html>
     `;
 
@@ -170,20 +207,60 @@ ${JSON.stringify(formData, null, 2)}
 
     iframe.onload = () => {
       const win = iframe.contentWindow;
-      win.document.title = "";
       win.focus();
       win.print();
     };
   };
 
+  const handleManualSave = () => {
+    if (!editedContent) return alert("Tidak ada CV yang bisa disimpan.");
+    const newHistory = [
+      { id: Date.now(), content: editedContent, date: new Date().toLocaleString() },
+      ...history,
+    ].slice(0, 5);
+    setHistory(newHistory);
+    localStorage.setItem("manual_saved_cv_history", JSON.stringify(newHistory));
+    alert("✅ CV berhasil disimpan ke history lokal.");
+  };
+
+  const handleClearHistory = () => {
+    localStorage.removeItem("manual_saved_cv_history");
+    setHistory([]);
+    alert("🗑️ Semua riwayat manual berhasil dihapus.");
+  };
+
+  const handleUseHistory = (item) => {
+    setGeneratedCV(item.content);
+    setEditedContent(item.content);
+    alert("✅ CV dari history berhasil dimuat.");
+  };
+
+  const handleShareLink = (item) => {
+    const link = `${window.location.origin}/dashboard?cv=${btoa(
+      encodeURIComponent(item.content)
+    )}`;
+    navigator.clipboard.writeText(link);
+    alert("🔗 Link share berhasil disalin:\n" + link);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center py-8 px-4">
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center py-8 px-4 relative">
+      {/* === LOGOUT BUTTON === */}
+      <button
+        onClick={handleLogout}
+        className="absolute top-4 right-6 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md"
+      >
+        Logout
+      </button>
+
+      {/* === UPDATED HEADER TITLE === */}
       <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-        CV Generator (RAG Interactive)
+        Dashboard CV Generator interaktif V2.0
       </h1>
 
+      {/* === REST OF ORIGINAL CODE (UNCHANGED) === */}
       <div className="grid md:grid-cols-2 gap-8 w-full max-w-7xl">
-        {/* === FORM === */}
+        {/* FORM */}
         <div className="bg-white shadow-lg rounded-2xl p-6 border border-gray-200">
           <h2 className="text-xl font-semibold text-blue-800 mb-4">Data Diri</h2>
 
@@ -194,9 +271,7 @@ ${JSON.stringify(formData, null, 2)}
               placeholder={key.replace(/^\w/, (c) => c.toUpperCase())}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3 text-sm focus:ring-2 focus:ring-blue-500"
               value={formData[key]}
-              onChange={(e) =>
-                setFormData({ ...formData, [key]: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
             />
           ))}
 
@@ -218,9 +293,7 @@ ${JSON.stringify(formData, null, 2)}
               placeholder={field.replace(/^\w/, (c) => c.toUpperCase())}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3 h-24 text-sm focus:ring-2 focus:ring-blue-500"
               value={formData[field]}
-              onChange={(e) =>
-                setFormData({ ...formData, [field]: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
             />
           ))}
 
@@ -228,38 +301,93 @@ ${JSON.stringify(formData, null, 2)}
             <button
               onClick={handleGenerate}
               disabled={loading}
-              className={`flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow ${
-                loading ? "opacity-70 cursor-not-allowed" : ""
-              }`}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
             >
-              {loading ? "Generating..." : "Generate CV"}
+              {loading ? "Menghasilkan..." : "Generate CV"}
             </button>
-
             <button
-              onClick={handleDownloadPDF}
-              className="flex-1 px-4 py-2 border border-blue-600 text-blue-600 hover:bg-blue-50 rounded-lg font-medium"
+              onClick={handleManualSave}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
             >
-              Download CV (PDF)
+              Simpan Manual
+            </button>
+            <button
+              onClick={handleClearHistory}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium"
+            >
+              Hapus Semua Save
             </button>
           </div>
         </div>
 
-        {/* === PREVIEW === */}
-        <div className="bg-white shadow-2xl border border-gray-200 rounded-2xl p-6 font-sans text-gray-900 overflow-y-auto max-h-[85vh]">
-          <div id="cv-preview">
-            {generatedCV ? (
-              <div
-                id="cv-preview-content"
-                dangerouslySetInnerHTML={{ __html: generatedCV }}
-                className="text-[15px] leading-relaxed"
-              />
-            ) : (
-              <p className="text-gray-500 text-center italic">
-                CV akan muncul di sini setelah klik{" "}
-                <b className="text-blue-600">Generate CV</b>.
-              </p>
-            )}
+        {/* PREVIEW */}
+        <div className="bg-white shadow-lg rounded-2xl p-6 border border-gray-200">
+          <h2 className="text-xl font-semibold text-blue-800 mb-4">Hasil CV</h2>
+
+          <div
+            id="cv-preview-content"
+            contentEditable={isEditing}
+            suppressContentEditableWarning={true}
+            spellCheck={true}
+            className={`border border-gray-200 rounded-lg p-4 min-h-[400px] prose max-w-none bg-white cursor-text ${
+              isEditing ? "outline outline-2 outline-blue-400" : "focus:outline-none"
+            }`}
+            dangerouslySetInnerHTML={{ __html: generatedCV }}
+            onInput={(e) => setEditedContent(e.currentTarget.innerHTML)}
+          />
+
+          <div className="flex flex-col sm:flex-row justify-between mt-4 gap-3">
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium w-full sm:w-auto"
+            >
+              {isEditing ? "Selesai Edit" : "Edit CV"}
+            </button>
+            <button
+              onClick={handleDownloadPDF}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium w-full sm:w-auto"
+            >
+              Download CV
+            </button>
           </div>
+
+          {history.length > 0 && (
+            <div className="mt-6 border-t pt-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                Riwayat CV Tersimpan
+              </h3>
+              <div className="grid md:grid-cols-1 gap-3">
+                {history.map((item, index) => (
+                  <div
+                    key={item.id || index}
+                    className="p-3 border border-gray-300 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-300"
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs text-gray-500">{item.date}</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleUseHistory(item)}
+                          className="text-blue-600 text-xs font-semibold hover:underline"
+                        >
+                          Gunakan Kembali
+                        </button>
+                        <button
+                          onClick={() => handleShareLink(item)}
+                          className="text-green-600 text-xs font-semibold hover:underline"
+                        >
+                          Salin Link
+                        </button>
+                      </div>
+                    </div>
+                    <div
+                      className="text-sm text-gray-800 line-clamp-4"
+                      dangerouslySetInnerHTML={{ __html: item.content }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
