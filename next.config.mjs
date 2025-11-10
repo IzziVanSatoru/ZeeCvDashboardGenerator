@@ -1,17 +1,14 @@
-/** @type {import('next').NextConfig} */
+ /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ Aktifkan React Compiler (React Forget)
   reactCompiler: true,
 
-  // ✅ Aktifkan experimental agar firebase-admin bisa dipakai di server components
-  experimental: {
-    serverComponentsExternalPackages: ["firebase-admin"],
-  },
+  // ganti experimental key lama dengan yang baru
+  serverExternalPackages: ["firebase-admin"],
 
-  // ✅ Konfirmasi penggunaan Turbopack (optional tapi disarankan)
+  // Turbopack aware
   turbopack: {},
 
-  // ✅ Tambahkan fallback untuk html2pdf.js (agar tidak error saat build di Vercel)
+  // fallback webpack (jika perlu)
   webpack: (config) => {
     config.externals = config.externals || [];
     config.externals.push({
