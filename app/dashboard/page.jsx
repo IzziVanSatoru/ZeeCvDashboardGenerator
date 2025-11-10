@@ -1,10 +1,10 @@
 "use client";
-export const dynamic = "force-dynamic"; // ✅ Fix build error di Vercel tanpa ubah logic
+export const dynamic = "force-dynamic"; // ✅ Fix build error di Vercel
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const [formData, setFormData] = useState({
     nama: "",
     telepon: "",
@@ -29,12 +29,12 @@ export default function DashboardPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // === NEW LOGOUT FEATURE ===
+  // === LOGOUT FEATURE ===
   const handleLogout = () => {
     const confirmLogout = window.confirm("Apakah anda ingin keluar?");
     if (confirmLogout) {
       const confirmFinal = prompt('Ketik "For real" untuk keluar atau "Nah ah" untuk batal:');
-      if (confirmFinal && confirmFinal.toLowerCase() === "for real") {
+      if (confirmFinal?.toLowerCase() === "for real") {
         alert("👋 Anda telah keluar.");
         router.push("/");
       } else {
@@ -43,6 +43,7 @@ export default function DashboardPage() {
     }
   };
 
+  // === LOAD CV DARI LINK ===
   useEffect(() => {
     const sharedCV = searchParams.get("cv");
     if (sharedCV) {
@@ -57,18 +58,21 @@ export default function DashboardPage() {
     }
   }, [searchParams]);
 
+  // === RESET LOCAL STORAGE SAAT REFRESH ===
   useEffect(() => {
     localStorage.removeItem("ai_cv_memory");
     const saved = localStorage.getItem("manual_saved_cv_history");
     if (saved) setHistory(JSON.parse(saved));
   }, []);
 
+  // === SIMPAN KE CACHE (FEEDBACK MEMORY AI) ===
   const saveToCache = (text) => {
     const newCache = [...recommendations, text].slice(-5);
     setRecommendations(newCache);
     localStorage.setItem("ai_cv_memory", JSON.stringify(newCache));
   };
 
+  // === GENERATE CV ===
   const handleGenerate = async () => {
     setLoading(true);
     try {
@@ -76,43 +80,37 @@ export default function DashboardPage() {
       if (!apiKey) throw new Error("API key tidak ditemukan di .env.local");
 
       const filledFormData = Object.fromEntries(
-        Object.entries(formData).map(([key, value]) => [key, value?.trim() || ""])
+        Object.entries(formData).map(([k, v]) => [k, v?.trim() || ""])
       );
 
-      const kontakParts = [];
-      if (filledFormData.telepon)
-        kontakParts.push(`<strong>Telepon:</strong> ${filledFormData.telepon}`);
-      if (filledFormData.email)
-        kontakParts.push(`<strong>Email:</strong> ${filledFormData.email}`);
-      if (filledFormData.linkedin)
-        kontakParts.push(`<strong>LinkedIn:</strong> ${filledFormData.linkedin}`);
-
       const kontakHTML =
-        kontakParts.length > 0
-          ? `
+        `
         <div class="contact-info" style="text-align:center; font-size:14px; color:#374151; margin-bottom:20px;">
-          <p>${kontakParts.join(" | ")}</p>
+          ${[
+            filledFormData.telepon && `<span>Telepon: ${filledFormData.telepon}</span>`,
+            filledFormData.email && `<span>Email: ${filledFormData.email}</span>`,
+            filledFormData.linkedin && `<span>LinkedIn: ${filledFormData.linkedin}</span>`,
+          ].filter(Boolean).join(" | ")}
         </div>
-      `
-          : "";
+      ` || "";
 
       const contextMemory = recommendations.join("\n");
 
       const prompt = `
-Kamu adalah AI pembuat CV profesional yang menampilkan hasil rapi, elegan, dan tidak berlebihan.
+Kamu adalah AI pembuat CV profesional, hasilnya rapi, elegan, tidak berlebihan.
 
-Instruksi penting:
+Instruksi:
 - Gunakan <h1> hanya untuk Nama.
-- Setelah <h1>, tampilkan Informasi Kontak dalam 1 baris saja (tanpa duplikat).
-- Gunakan <h3> untuk setiap bagian: Profil, Pendidikan, Pengalaman, Keahlian, Sertifikat, Proyek, Referensi.
-- Gunakan <p> untuk isi tiap bagian.
-- Jangan tampilkan "(Empty)" jika data kosong — biarkan bagian itu tidak muncul.
-- Bahasa formal, rapi, profesional, tidak berlebihan.
+- Setelah <h1>, tampilkan kontak (Telepon | Email | LinkedIn) hanya satu baris, tanpa duplikat.
+- Gunakan <h3> untuk judul bagian (Profil, Pendidikan, Pengalaman, dll).
+- Gunakan <p> untuk isi setiap bagian.
+- Jangan tampilkan bagian kosong.
+- Bahasa formal dan profesional.
 
 Data pengguna:
 ${JSON.stringify(filledFormData, null, 2)}
 
-Memori kontekstual sebelumnya:
+Memori AI sebelumnya:
 ${contextMemory}
 `;
 
@@ -128,7 +126,7 @@ ${contextMemory}
             {
               role: "system",
               content:
-                "Kamu adalah AI pembuat Curriculum Vitae profesional dengan gaya HRD-style formal dan elegan. Fokus pada kejelasan dan struktur yang rapi tanpa mengulang bagian kontak.",
+                "Kamu adalah AI pembuat Curriculum Vitae profesional dan tidak menduplikasi bagian kontak.",
             },
             { role: "user", content: prompt },
           ],
@@ -141,12 +139,13 @@ ${contextMemory}
       let result = data?.choices?.[0]?.message?.content || "";
       result = result.replace(/```html|```/g, "").trim();
 
+      // 🔧 Bersihkan duplikasi kontak
       result = result
         .replace(/Informasi Kontak:|Kontak:/gi, "")
         .replace(/<div class="contact-info"[\s\S]*?<\/div>/gi, "")
-        .replace(/<p>.*?(Telepon|Email|LinkedIn).*?<\/p>/gi, "")
-        .replace(/Telepon:.*?(LinkedIn|Email):.*?<br\s*\/?>/gi, "");
+        .replace(/<p>.*?(Telepon|Email|LinkedIn).*?<\/p>/gi, "");
 
+      // Sisipkan kontak yang benar setelah nama
       result = result.replace(/(<h1[^>]*>.*?<\/h1>)/i, `$1${kontakHTML}`);
 
       setGeneratedCV(result);
@@ -160,6 +159,7 @@ ${contextMemory}
     }
   };
 
+  // === DOWNLOAD PDF MANUAL (LEBIH RAPIH DAN PROFESIONAL) ===
   const handleDownloadPDF = () => {
     const cvElement = document.getElementById("cv-preview-content");
     if (!cvElement) return alert("CV belum tersedia untuk diunduh.");
@@ -173,12 +173,8 @@ ${contextMemory}
             @page { size: A4 portrait; margin: 18mm; }
             body {
               font-family: 'Calibri', 'Segoe UI', sans-serif;
-              background: #ffffff;
-              color: #111827;
-              line-height: 1.6;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
+              background: #fff; color: #111827;
+              display: flex; flex-direction: column; align-items: center;
             }
             h1 { text-align:center; font-size:26px; margin-bottom:4px; color:#1f2937; }
             h1::after {
@@ -188,8 +184,8 @@ ${contextMemory}
             .contact-info { text-align:center; font-size:13px; color:#374151; margin-bottom:18px; }
             h3 {
               color:#1d4ed8; font-size:17px; font-weight:600;
-              border-bottom:2px solid #93c5fd; margin-top:20px;
-              margin-bottom:6px; padding-bottom:3px; text-transform:uppercase;
+              border-bottom:2px solid #93c5fd; margin-top:20px; margin-bottom:6px;
+              padding-bottom:3px; text-transform:uppercase;
             }
             p { font-size:13.5px; margin:4px 0; color:#1f2937; text-align:justify; }
             #cv-wrapper { width:85%; max-width:680px; margin:0 auto; }
@@ -214,6 +210,7 @@ ${contextMemory}
     };
   };
 
+  // === MANUAL SAVE ===
   const handleManualSave = () => {
     if (!editedContent) return alert("Tidak ada CV yang bisa disimpan.");
     const newHistory = [
@@ -225,18 +222,19 @@ ${contextMemory}
     alert("✅ CV berhasil disimpan ke history lokal.");
   };
 
+  // === HAPUS RIWAYAT ===
   const handleClearHistory = () => {
     localStorage.removeItem("manual_saved_cv_history");
     setHistory([]);
     alert("🗑️ Semua riwayat manual berhasil dihapus.");
   };
 
+  // === LOAD HISTORY / SHARE ===
   const handleUseHistory = (item) => {
     setGeneratedCV(item.content);
     setEditedContent(item.content);
     alert("✅ CV dari history berhasil dimuat.");
   };
-
   const handleShareLink = (item) => {
     const link = `${window.location.origin}/dashboard?cv=${btoa(
       encodeURIComponent(item.content)
@@ -245,9 +243,9 @@ ${contextMemory}
     alert("🔗 Link share berhasil disalin:\n" + link);
   };
 
+  // === UI ===
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-8 px-4 relative">
-      {/* === LOGOUT BUTTON === */}
       <button
         onClick={handleLogout}
         className="absolute top-4 right-6 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md"
@@ -255,14 +253,12 @@ ${contextMemory}
         Logout
       </button>
 
-      {/* === UPDATED HEADER TITLE === */}
       <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-        Dashboard CV Generator interaktif V2.0
+        Dashboard CV Generator Interaktif V2.0
       </h1>
 
-      {/* === REST OF ORIGINAL CODE (UNCHANGED) === */}
       <div className="grid md:grid-cols-2 gap-8 w-full max-w-7xl">
-        {/* FORM */}
+        {/* FORM INPUT */}
         <div className="bg-white shadow-lg rounded-2xl p-6 border border-gray-200">
           <h2 className="text-xl font-semibold text-blue-800 mb-4">Data Diri</h2>
 
@@ -322,7 +318,7 @@ ${contextMemory}
           </div>
         </div>
 
-        {/* PREVIEW */}
+        {/* PREVIEW CV */}
         <div className="bg-white shadow-lg rounded-2xl p-6 border border-gray-200">
           <h2 className="text-xl font-semibold text-blue-800 mb-4">Hasil CV</h2>
 
@@ -332,7 +328,7 @@ ${contextMemory}
             suppressContentEditableWarning={true}
             spellCheck={true}
             className={`border border-gray-200 rounded-lg p-4 min-h-[400px] prose max-w-none bg-white cursor-text ${
-              isEditing ? "outline outline-2 outline-blue-400" : "focus:outline-none"
+              isEditing ? "outline outline-2 outline-blue-400" : ""
             }`}
             dangerouslySetInnerHTML={{ __html: generatedCV }}
             onInput={(e) => setEditedContent(e.currentTarget.innerHTML)}
@@ -371,13 +367,13 @@ ${contextMemory}
                           onClick={() => handleUseHistory(item)}
                           className="text-blue-600 text-xs font-semibold hover:underline"
                         >
-                          Gunakan Kembali
+                          Gunakan
                         </button>
                         <button
                           onClick={() => handleShareLink(item)}
                           className="text-green-600 text-xs font-semibold hover:underline"
                         >
-                          Salin Link
+                          Share Link
                         </button>
                       </div>
                     </div>
@@ -393,5 +389,13 @@ ${contextMemory}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-10">Memuat dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
